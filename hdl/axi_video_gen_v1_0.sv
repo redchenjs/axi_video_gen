@@ -46,6 +46,9 @@ module axi_video_gen_v1_0 #(
     output logic pic_load_error
 );
 
+localparam [15:0] BMP_WIDTH  = 1920;
+localparam [15:0] BMP_HEIGHT = 1080;
+
 typedef enum logic [1:0] {
     IDLE      = 2'b00,
     SCAN_FILE = 2'b01,
@@ -70,10 +73,12 @@ logic       sdcard_file_found;
 logic pic_load_init_p;
 logic pic_load_init_n;
 
-logic pic_data_next;
-
 logic  [2:0] pic_byte_sel;
 logic [31:0] pic_byte_cnt;
+
+logic        pic_data_next;
+logic [15:0] pic_data_xcol;
+logic [15:0] pic_data_ycol;
 
 logic [23:0] color_data;
 logic [23:0] color_grey;
@@ -96,7 +101,10 @@ assign m_axi_wvalid = axi_wvalid;
 assign m_axi_bready	= axi_bready;
 
 wire pic_head_done = (pic_byte_cnt > (54 - 1));
-wire pic_data_done = (pic_byte_cnt > (54 + 1920 * 1080 * 3 - 1));
+wire pic_data_done = (pic_byte_cnt > (54 + BMP_WIDTH * BMP_HEIGHT * 3 - 1));
+
+wire pic_xcol_done = (pic_data_xcol == (BMP_WIDTH - 1));
+wire pic_ycol_done = (pic_data_ycol == (BMP_HEIGHT - 1));
 
 sd_file_reader #(
     .FILE_NAME("pic.bmp"),
@@ -145,6 +153,8 @@ begin
         pic_byte_cnt <= 32'h0000_0000;
 
         pic_data_next <= 1'b0;
+        pic_data_xcol <= 16'h0000;
+        pic_data_ycol <= 16'h0000;
 
         pic_load_head  <= 1'b0;
         pic_load_data  <= 1'b0;
@@ -167,7 +177,7 @@ begin
                 ctl_sta <= IDLE;
         endcase
 
-        axi_awaddr  <= sdcard_file_found ? (axi_bready ? axi_awaddr + 3'h4 : axi_awaddr) : 32'h0000_0000;
+        axi_awaddr  <= (~axi_awvalid & pic_data_next) ? {(BMP_HEIGHT - 1 - pic_data_ycol) * BMP_WIDTH + pic_data_xcol, 2'b00} : axi_awaddr;
         axi_awvalid <= (m_axi_awready & axi_awvalid) ? 1'b0 : (~axi_awvalid & pic_data_next) ? 1'b1 : axi_awvalid;
 
         axi_wdata  <= (~axi_wvalid & pic_data_next) ? {8'h00, color_data} : axi_wdata;
@@ -179,6 +189,16 @@ begin
         pic_byte_cnt <= sdcard_file_found ? pic_byte_cnt + sdcard_outreq : 32'h0000_0000;
 
         pic_data_next <= (pic_byte_sel[2] & pic_head_done & sdcard_outreq);
+
+        if (sdcard_file_found) begin
+            if (axi_bready) begin
+                pic_data_xcol <= pic_xcol_done ? 16'h0000 : pic_data_xcol + 1'b1;
+                pic_data_ycol <= pic_xcol_done ? pic_data_ycol + 1'b1 : pic_data_ycol;
+            end
+        end else begin
+            pic_data_xcol <= 16'h0000;
+            pic_data_ycol <= 16'h0000;
+        end
 
         pic_load_head  <= (ctl_sta == READ_HEAD);
         pic_load_data  <= (ctl_sta == READ_DATA);
