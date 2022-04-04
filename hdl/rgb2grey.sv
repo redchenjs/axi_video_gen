@@ -46,7 +46,7 @@ begin
         color_data_y   <= 16'h0000;
         color_data_vld <= 1'b0;
     end else begin
-        color_data_y   <= color_data_r * 77 + color_data_g * 150 + color_data_b * 29;
+        color_data_y   <= color_data_vld_i ? color_data_r * 77 + color_data_g * 150 + color_data_b * 29 : color_data_y;
         color_data_vld <= color_data_vld_i;
     end
 end

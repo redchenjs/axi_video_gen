@@ -34,10 +34,9 @@ module axi_video_gen_v1_0 #(
     input  logic       m_axi_bvalid,
     output logic       m_axi_bready,
 
-    input  logic spi_miso,
-    output logic spi_mosi,
-    output logic spi_sclk,
-    output logic spi_cs_n,
+    inout  logic [3:0] sd_dat,
+    inout  logic       sd_cmd,
+    output logic       sd_clk,
 
     input  logic pic_load_init,
     output logic pic_load_head,
@@ -66,7 +65,7 @@ logic        axi_wvalid;
 
 logic axi_bready;
 
-logic       sdcard_outreq;
+logic       sdcard_outen;
 logic [7:0] sdcard_outbyte;
 logic       sdcard_file_found;
 
@@ -111,23 +110,22 @@ wire pic_ycol_done = (pic_data_ycol == (BMP_HEIGHT - 1));
 
 sd_file_reader #(
     .FILE_NAME("pic.bmp"),
-    .SPI_CLK_DIV(10)
+    .CLK_DIV(0)
 ) sd_file_reader (
     .clk(m_axi_aclk),
-    .rst_n(ctl_sta != IDLE),
+    .rstn(ctl_sta != IDLE),
 
-    .spi_miso(spi_miso),
-    .spi_mosi(spi_mosi),
-    .spi_clk(spi_sclk),
-    .spi_cs_n(spi_cs_n),
+    .sdclk(sd_clk),
+    .sdcmd(sd_cmd),
+    .sddat0(sd_dat[0]),
 
-    .sdcardtype(),
-    .filesystemtype(),
-    .sdcardstate(),
-    .fatstate(),
+    .card_type(),
+    .card_stat(),
+    .filesystem_type(),
+    .filesystem_stat(),
     .file_found(sdcard_file_found),
 
-    .outreq(sdcard_outreq),
+    .outen(sdcard_outen),
     .outbyte(sdcard_outbyte)
 );
 
@@ -185,7 +183,7 @@ begin
             IDLE:
                 ctl_sta <= pic_load_init_n ? SCAN_FILE : ctl_sta;
             SCAN_FILE:
-                ctl_sta <= sdcard_file_found ? READ_HEAD : (pic_load_init_n ? IDLE : ctl_sta);
+                ctl_sta <= sdcard_file_found ? READ_HEAD : ctl_sta;
             READ_HEAD:
                 ctl_sta <= pic_head_done ? READ_DATA : ctl_sta;
             READ_DATA:
@@ -202,11 +200,11 @@ begin
 
         axi_bready <= (m_axi_bvalid & ~axi_bready);
 
-        pic_byte_sel <= pic_head_done ? (sdcard_outreq ? {pic_byte_sel[1:0], pic_byte_sel[2]} : pic_byte_sel) : 3'b001;
-        pic_byte_cnt <= sdcard_file_found ? pic_byte_cnt + sdcard_outreq : 32'h0000_0000;
+        pic_byte_sel <= pic_head_done ? (sdcard_outen ? {pic_byte_sel[1:0], pic_byte_sel[2]} : pic_byte_sel) : 3'b001;
+        pic_byte_cnt <= sdcard_file_found ? pic_byte_cnt + sdcard_outen : 32'h0000_0000;
 
-        pic_conv_en  <= pic_data_done ? ~pic_conv_en : pic_conv_en;
-        pic_data_req <= pic_head_done & pic_byte_sel[2] & sdcard_outreq;
+        pic_conv_en  <= pic_load_init_n & (ctl_sta == IDLE) ? ~pic_conv_en : pic_conv_en;
+        pic_data_req <= pic_head_done & pic_byte_sel[2] & sdcard_outen;
 
         if (sdcard_file_found) begin
             if (axi_bready) begin
@@ -223,7 +221,7 @@ begin
         pic_load_done  <= (ctl_sta == IDLE);
         pic_load_error <= (ctl_sta == SCAN_FILE);
 
-        if (pic_head_done & sdcard_outreq) begin
+        if (pic_head_done & sdcard_outen) begin
             case (pic_byte_sel)
                 3'b001: begin
                     color_temp <= {color_temp[23:16], color_temp[15:8], sdcard_outbyte};
