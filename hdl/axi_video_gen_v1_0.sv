@@ -34,9 +34,9 @@ module axi_video_gen_v1_0 #(
     input  logic       m_axi_bvalid,
     output logic       m_axi_bready,
 
-    inout  logic [3:0] sd_dat,
-    inout  logic       sd_cmd,
-    output logic       sd_clk,
+    output logic       sdio_clk,
+    inout  logic       sdio_cmd,
+    inout  logic [3:0] sdio_data,
 
     input  logic pic_load_init,
     output logic pic_load_head,
@@ -115,9 +115,9 @@ sd_file_reader #(
     .clk(m_axi_aclk),
     .rstn(ctl_sta != IDLE),
 
-    .sdclk(sd_clk),
-    .sdcmd(sd_cmd),
-    .sddat0(sd_dat[0]),
+    .sdclk(sdio_clk),
+    .sdcmd(sdio_cmd),
+    .sddat0(sdio_data[0]),
 
     .card_type(),
     .card_stat(),
