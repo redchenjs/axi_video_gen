@@ -76,12 +76,15 @@ logic pic_load_init_n;
 logic  [2:0] pic_byte_sel;
 logic [31:0] pic_byte_cnt;
 
-logic        pic_data_next;
+logic pic_conv_en;
+logic pic_data_req;
+logic pic_data_vld;
+
 logic [15:0] pic_data_xcol;
 logic [15:0] pic_data_ycol;
 
+logic [23:0] color_temp;
 logic [23:0] color_data;
-logic [23:0] color_grey;
 
 assign m_axi_awaddr  = C_M_AXI_TARGET_SLAVE_BASE_ADDR + axi_awaddr;
 assign m_axi_awlen   = 0;
@@ -136,6 +139,19 @@ edge2en pic_load_init_en(
     .neg_edge_o(pic_load_init_n)
 );
 
+rgb2grey rgb2grey(
+    .clk_i(m_axi_aclk),
+    .rst_n_i(m_axi_aresetn),
+
+    .color_conv_en_i(pic_conv_en),
+
+    .color_data_i(color_temp),
+    .color_data_vld_i(pic_data_req),
+
+    .color_data_o(color_data),
+    .color_data_vld_o(pic_data_vld)
+);
+
 always_ff @(posedge m_axi_aclk or negedge m_axi_aresetn)
 begin
     if (!m_axi_aresetn) begin
@@ -152,7 +168,9 @@ begin
         pic_byte_sel <= 3'b000;
         pic_byte_cnt <= 32'h0000_0000;
 
-        pic_data_next <= 1'b0;
+        pic_conv_en  <= 1'b0;
+        pic_data_req <= 1'b0;
+
         pic_data_xcol <= 16'h0000;
         pic_data_ycol <= 16'h0000;
 
@@ -161,8 +179,7 @@ begin
         pic_load_done  <= 1'b0;
         pic_load_error <= 1'b0;
 
-        color_data <= 24'h00_0000;
-        color_grey <= 24'h00_0000;
+        color_temp <= 24'h00_0000;
     end else begin
         case (ctl_sta)
             IDLE:
@@ -177,18 +194,19 @@ begin
                 ctl_sta <= IDLE;
         endcase
 
-        axi_awaddr  <= (~axi_awvalid & pic_data_next) ? {(BMP_HEIGHT - 1 - pic_data_ycol) * BMP_WIDTH + pic_data_xcol, 2'b00} : axi_awaddr;
-        axi_awvalid <= (m_axi_awready & axi_awvalid) ? 1'b0 : (~axi_awvalid & pic_data_next) ? 1'b1 : axi_awvalid;
+        axi_awaddr  <= (~axi_awvalid & pic_data_vld) ? {(BMP_HEIGHT - 1 - pic_data_ycol) * BMP_WIDTH + pic_data_xcol, 2'b00} : axi_awaddr;
+        axi_awvalid <= (m_axi_awready & axi_awvalid) ? 1'b0 : (~axi_awvalid & pic_data_vld) ? 1'b1 : axi_awvalid;
 
-        axi_wdata  <= (~axi_wvalid & pic_data_next) ? {8'h00, color_data} : axi_wdata;
-        axi_wvalid <= (m_axi_wready & axi_wvalid) ? 1'b0 : (~axi_wvalid & pic_data_next) ? 1'b1 : axi_wvalid;
+        axi_wdata  <= (~axi_wvalid & pic_data_vld) ? {8'h00, color_data} : axi_wdata;
+        axi_wvalid <= (m_axi_wready & axi_wvalid) ? 1'b0 : (~axi_wvalid & pic_data_vld) ? 1'b1 : axi_wvalid;
 
         axi_bready <= (m_axi_bvalid & ~axi_bready);
 
         pic_byte_sel <= pic_head_done ? (sdcard_outreq ? {pic_byte_sel[1:0], pic_byte_sel[2]} : pic_byte_sel) : 3'b001;
         pic_byte_cnt <= sdcard_file_found ? pic_byte_cnt + sdcard_outreq : 32'h0000_0000;
 
-        pic_data_next <= (pic_byte_sel[2] & pic_head_done & sdcard_outreq);
+        pic_conv_en  <= pic_data_done ? ~pic_conv_en : pic_conv_en;
+        pic_data_req <= pic_head_done & pic_byte_sel[2] & sdcard_outreq;
 
         if (sdcard_file_found) begin
             if (axi_bready) begin
@@ -208,18 +226,16 @@ begin
         if (pic_head_done & sdcard_outreq) begin
             case (pic_byte_sel)
                 3'b001: begin
-                    color_data <= {color_data[23:16], color_data[15:8], sdcard_outbyte};
+                    color_temp <= {color_temp[23:16], color_temp[15:8], sdcard_outbyte};
                 end
                 3'b010: begin
-                    color_data <= {color_data[23:16], sdcard_outbyte, color_data[7:0]};
+                    color_temp <= {color_temp[23:16], sdcard_outbyte, color_temp[7:0]};
                 end
                 3'b100: begin
-                    color_data <= {sdcard_outbyte, color_data[15:8], color_data[7:0]};
+                    color_temp <= {sdcard_outbyte, color_temp[15:8], color_temp[7:0]};
                 end
             endcase
         end
-
-        color_grey <= 24'h00_0000;
     end
 end
 
