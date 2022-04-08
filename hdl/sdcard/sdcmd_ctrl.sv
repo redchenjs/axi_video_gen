@@ -58,10 +58,10 @@ assign resparg = response.arg;
 reg  [17:0] clkdivr = '0;
 reg  [17:0] clkcnt  = '0;
 reg  [15:0] cnt1 = '0;
-reg  [ 5:0] cnt2 = '0;
+reg  [ 5:0] cnt2 = '1;
 reg  [ 1:0] cnt3 = '0;
 reg  [ 7:0] cnt4 = '0;
-reg  [ 7:0] cnt5 = '0;
+reg  [ 7:0] cnt5 = '1;
 
 
 always @ (posedge clk or negedge rstn)
