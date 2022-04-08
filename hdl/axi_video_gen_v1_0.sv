@@ -137,7 +137,7 @@ edge2en pic_load_init_en(
     .neg_edge_o(pic_load_init_n)
 );
 
-rgb2grey rgb2grey(
+color_conv color_conv(
     .clk_i(m_axi_aclk),
     .rst_n_i(m_axi_aresetn),
 

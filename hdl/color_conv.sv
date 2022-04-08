@@ -1,5 +1,5 @@
 /*
- * rgb2grey.sv
+ * color_conv.sv
  *
  *  Created on: 2022-04-04 11:05
  *      Author: Jack Chen <redchenjs@live.com>
@@ -7,7 +7,7 @@
 
 `timescale 1 ns / 1 ps
 
-module rgb2grey(
+module color_conv(
     input logic clk_i,
     input logic rst_n_i,
 

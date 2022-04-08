@@ -35,8 +35,9 @@ reg sdcmdoe  = 1'b0;
 reg sdcmdout = 1'b1;
 
 // sdcmd tri-state driver
-assign sdcmd = sdcmdoe ? sdcmdout : 1'bz;
-wire sdcmdin = sdcmdoe ? 1'b1 : sdcmd;
+// assign sdcmd = sdcmdoe ? sdcmdout : 1'bz;
+// wire sdcmdin = sdcmdoe ? 1'b1 : sdcmd;
+IOBUF sdcmdio(.O(sdcmdin), .IO(sdcmd), .I(sdcmdout), .T(~sdcmdoe));
 
 function automatic logic [6:0] CalcCrc7(input logic [6:0] crc, input logic inbit);
     return {crc[5:0],crc[6]^inbit} ^ {3'b0,crc[6]^inbit,3'b0};

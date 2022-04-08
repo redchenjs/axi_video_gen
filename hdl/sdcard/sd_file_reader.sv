@@ -123,7 +123,7 @@ wire [15:0] rootdir_itemcount  =   {sector_content['h12],sector_content['h11]}; 
 reg  [31:0] sectors_per_fat = '0;
 reg  [31:0] root_cluster    = '0;
 
-always_comb begin    
+always_comb begin
     sectors_per_fat   = {16'h0, sector_content['h17], sector_content['h16]};
     root_cluster      = 0;
     if(sectors_per_fat>0) begin  // FAT16 case
@@ -174,20 +174,20 @@ always @ (posedge clk or negedge rstn)
                                     if(filesystem_parsed==FAT16) begin
                                         cluster_size        = sector_per_cluster;
                                         first_fat_sector_no = read_sector_no + resv_sectors;
-                                        
+
                                         rootdir_sectorcount = rootdir_itemcount / (16'd512/16'd32);
                                         rootdir_sector      = first_fat_sector_no + sectors_per_fat * number_of_fat;
                                         first_data_sector_no= rootdir_sector + rootdir_sectorcount - cluster_size*2;
-                                        
+
                                         cluster_sector_offset = 8'h0;
                                         read_sector_no      <= rootdir_sector + cluster_sector_offset;
                                         filesystem_state <= LS_ROOT_FAT16;
                                     end else if(filesystem_parsed==FAT32) begin
                                         cluster_size        = sector_per_cluster;
                                         first_fat_sector_no = read_sector_no + resv_sectors;
-                                        
+
                                         first_data_sector_no= first_fat_sector_no + sectors_per_fat * number_of_fat - cluster_size * 2;
-                                        
+
                                         curr_cluster        = root_cluster;
                                         cluster_sector_offset = 8'h0;
                                         read_sector_no      <= first_data_sector_no + cluster_size * curr_cluster + cluster_sector_offset;
@@ -344,7 +344,7 @@ always @ (posedge clk or negedge rstn) begin
         fready<=1'b0;  fnamelen<=8'h0; file_namelen<=8'h0;
         fcluster<=16'h0;  fsize<=0;
         for(int i=0;i<52;i++) begin file_name[i]<=8'h0; fname[i]<=8'h0; end
-        
+
         {isshort, islongok, islong, longvalid} = 4'b0000;
         longno     = 6'h0;
         lastchar  <= 8'h0;
@@ -354,7 +354,7 @@ always @ (posedge clk or negedge rstn) begin
         fready<=1'b0;  fnamelen<=8'h0;
         for(int i=0;i<52;i++) fname[i]<=8'h0;
         fcluster<=16'h0;  fsize<=0;
-        
+
         if( rvalid && (filesystem_state==LS_ROOT_FAT16||filesystem_state==LS_ROOT_FAT32) && ~search_fat ) begin
             case(raddr[4:0])
             5'h1A : file_1st_cluster[ 0+:8] = rdata;
@@ -364,18 +364,18 @@ always @ (posedge clk or negedge rstn) begin
             5'h1E :    file_1st_size[16+:8] = rdata;
             5'h1F :    file_1st_size[24+:8] = rdata;
             endcase
-            
+
             if(raddr[4:0]==5'h0) begin
                 {islongok, isshort} = 2'b00;
                 fdtnamelen = 8'h0;  sdtnamelen=8'h0;
-                
+
                 if(rdata!=8'hE5 && rdata!=8'h2E && rdata!=8'h00) begin
                     if(islong && longno==6'h1)
                         islongok = 1'b1;
                     else
                         isshort = 1'b1;
                 end
-                
+
                 if(rdata[7]==1'b0 && ~islongok) begin
                     if(rdata[6]) begin
                         {islong,longvalid} = 2'b11;
@@ -405,7 +405,7 @@ always @ (posedge clk or negedge rstn) begin
                     fsize <= file_1st_size;
                 end
             end
-            
+
             if(islong) begin
                 if(raddr[4:0]>5'h0&&raddr[4:0]<5'hB || raddr[4:0]>=5'hE&&raddr[4:0]<5'h1A || raddr[4:0]>=5'h1C)begin
                     if(raddr[4:0]<5'hB ? raddr[0] : ~raddr[0]) begin
@@ -417,15 +417,15 @@ always @ (posedge clk or negedge rstn) begin
                             file_namelen <= fdtnamelen-8'd1 + (longno-8'd1)*8'd13;
                         end else if({rdata,lastchar} != 16'hFFFF) begin
                             if(rdata == 8'h0) begin
-                                file_name[fdtnamelen-8'd1+(longno-8'd1)*8'd13] <= (lastchar>=8'h61 && lastchar<=8'h7A) ? lastchar&8'b11011111 : lastchar; 
+                                file_name[fdtnamelen-8'd1+(longno-8'd1)*8'd13] <= (lastchar>=8'h61 && lastchar<=8'h7A) ? lastchar&8'b11011111 : lastchar;
                             end else begin
                                 longvalid = 1'b0;
                             end
                         end
                     end
                 end
-            end 
-            
+            end
+
             if(isshort) begin
                 if(raddr[4:0]<5'h8) begin
                     if(rdata!=8'h20) begin
@@ -445,7 +445,7 @@ always @ (posedge clk or negedge rstn) begin
                     file_namelen <= sdtnamelen;
                 end
             end
-            
+
         end
     end
 end

@@ -26,7 +26,7 @@ module sd_reader # (
     output wire [ 1:0]  card_type,
     output wire [ 3:0]  card_stat,
     // user read sector command interface (sync with clk)
-    input  wire         rstart, 
+    input  wire         rstart,
     input  wire [31:0]  rsector,
     output wire         rbusy,
     output wire         rdone,
@@ -118,7 +118,7 @@ always @ (posedge clk or negedge rstn)
                 CMD3    :   set_cmd(1,                   24 ,  3,  'h00000000);
                 CMD7    :   set_cmd(1,                   24 ,  7, {rca,16'h0});
                 CMD16   :   set_cmd(1, (SIMULATE?128:64000) , 16,  'h00000200);
-                CMD17   :   if(rstart) begin 
+                CMD17   :   if(rstart) begin
                                 set_cmd(1, 32, 17, (cardtype==SDHCv2) ? rsector : (rsector<<9) );
                                 rsectoraddr <= (cardtype==SDHCv2) ? rsector : (rsector<<9);
                                 card_state <= READING;
@@ -195,7 +195,7 @@ always @ (posedge clk or negedge rstn)
                         end
                         if(ridx >= 512*8-1) begin
                             sddat_state <= RTAIL;
-                            ridx   <= 0; 
+                            ridx   <= 0;
                         end else
                             ridx   <= ridx + 1;
                     end
