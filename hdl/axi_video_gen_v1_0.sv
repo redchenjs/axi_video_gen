@@ -7,9 +7,29 @@
 
 `timescale 1 ns / 1 ps
 
-module axi_video_gen_v1_0 #(
-    parameter C_M_AXI_TARGET_SLAVE_BASE_ADDR = 32'h40000000
-) (
+module axi_video_gen_v1_0(
+    input logic s_axi_aclk,
+    input logic s_axi_aresetn,
+
+    input  logic [31:0] s_axi_awaddr,
+    input  logic        s_axi_awvalid,
+    output logic        s_axi_awready,
+
+    input  logic [31:0] s_axi_wdata,
+    input  logic        s_axi_wvalid,
+    output logic        s_axi_wready,
+
+    output logic s_axi_bvalid,
+    input  logic s_axi_bready,
+
+    input  logic [31:0] s_axi_araddr,
+    input  logic        s_axi_arvalid,
+    output logic        s_axi_arready,
+
+    output logic [31:0] s_axi_rdata,
+    output logic        s_axi_rvalid,
+    input  logic        s_axi_rready,
+
     input logic m_axi_aclk,
     input logic m_axi_aresetn,
 
@@ -57,6 +77,8 @@ typedef enum logic [1:0] {
 
 state_t ctl_sta;
 
+logic [31:0] axi_awaddr_base;
+
 logic [31:0] axi_awaddr;
 logic        axi_awvalid;
 
@@ -85,7 +107,17 @@ logic [15:0] pic_data_ycol;
 logic [23:0] color_temp;
 logic [23:0] color_data;
 
-assign m_axi_awaddr  = C_M_AXI_TARGET_SLAVE_BASE_ADDR + axi_awaddr;
+wire pic_head_done = (pic_byte_cnt > (54 - 1));
+wire pic_data_done = (pic_byte_cnt > (54 + BMP_WIDTH * BMP_HEIGHT * 3 - 1));
+
+wire pic_xcol_done = (pic_data_xcol == (BMP_WIDTH - 1));
+wire pic_ycol_done = (pic_data_ycol == (BMP_HEIGHT - 1));
+
+assign s_axi_awready = s_axi_aresetn && s_axi_awvalid && (!s_axi_bvalid || s_axi_bready);
+assign s_axi_wready  = s_axi_aresetn && s_axi_wvalid  && (!s_axi_bvalid || s_axi_bready);
+assign s_axi_arready = s_axi_aresetn && s_axi_arvalid && (!s_axi_rvalid || s_axi_rready);
+
+assign m_axi_awaddr  = axi_awaddr_base + axi_awaddr;
 assign m_axi_awlen   = 0;
 assign m_axi_awsize  = 3'h2;
 assign m_axi_awburst = 2'h1;
@@ -101,12 +133,6 @@ assign m_axi_wlast  = axi_wvalid;
 assign m_axi_wvalid = axi_wvalid;
 
 assign m_axi_bready	= axi_bready;
-
-wire pic_head_done = (pic_byte_cnt > (54 - 1));
-wire pic_data_done = (pic_byte_cnt > (54 + BMP_WIDTH * BMP_HEIGHT * 3 - 1));
-
-wire pic_xcol_done = (pic_data_xcol == (BMP_WIDTH - 1));
-wire pic_ycol_done = (pic_data_ycol == (BMP_HEIGHT - 1));
 
 sd_file_reader #(
     .FILE_NAME("pic.bmp"),
@@ -150,9 +176,38 @@ color_conv color_conv(
     .color_data_vld_o(pic_data_vld)
 );
 
-always_ff @(posedge m_axi_aclk or negedge m_axi_aresetn)
+always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn)
 begin
-    if (!m_axi_aresetn) begin
+    if (!s_axi_aresetn) begin
+        s_axi_rdata <= {32{1'b0}};
+
+        s_axi_bvalid <= 1'b0;
+        s_axi_rvalid <= 1'b0;
+    end else begin
+        if (s_axi_awready) begin
+            case (s_axi_awaddr[7:0])
+                8'h00:
+                    axi_awaddr_base <= s_axi_wdata;
+            endcase
+        end
+
+        if (s_axi_arready) begin
+            case (s_axi_araddr[7:0])
+                8'h00:
+                    s_axi_rdata <= axi_awaddr_base;
+                default:
+                    s_axi_rdata <= {32{1'b0}};
+            endcase
+        end
+
+        s_axi_bvalid <= (s_axi_bvalid & ~s_axi_bready) | s_axi_awready;
+        s_axi_rvalid <= (s_axi_rvalid & ~s_axi_rready) | s_axi_arready;
+    end
+end
+
+always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn)
+begin
+    if (!s_axi_aresetn) begin
         ctl_sta <= IDLE;
 
         axi_awaddr  <= 32'h0000_0000;
