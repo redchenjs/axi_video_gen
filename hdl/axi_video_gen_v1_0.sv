@@ -135,15 +135,14 @@ assign m_axi_wvalid = axi_wvalid;
 assign m_axi_bready	= axi_bready;
 
 sd_file_reader #(
-    .FILE_NAME("pic.bmp"),
-    .CLK_DIV(0)
+    .FILE_NAME("pic.bmp")
 ) sd_file_reader (
     .clk(m_axi_aclk),
     .rstn(ctl_sta != IDLE),
 
     .sdclk(sdio_clk),
     .sdcmd(sdio_cmd),
-    .sddat0(sdio_data[0]),
+    .sddat(sdio_data),
 
     .card_type(),
     .card_stat(),

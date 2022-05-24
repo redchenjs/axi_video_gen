@@ -10,14 +10,9 @@
 //--------------------------------------------------------------------------------------------------------
 
 module sd_file_reader #(
-    parameter FILE_NAME = "example.txt",    // file to read, ignore Upper and Lower Case
+    parameter FILE_NAME = "example.txt"     // file to read, ignore Upper and Lower Case
                                             // For example, if you want to read a file named HeLLo123.txt in the SD card,
                                             // this parameter can be hello123.TXT, HELLO123.txt or HEllo123.Txt
-    parameter [2:0] CLK_DIV = 3'd1      // when clk =   0~ 25MHz , set CLK_DIV = 3'd0,
-                                        // when clk =  25~ 50MHz , set CLK_DIV = 3'd1,
-                                        // when clk =  50~100MHz , set CLK_DIV = 3'd2,
-                                        // when clk = 100~200MHz , set CLK_DIV = 3'd3,
-                                        // ......
 )(
     // rstn active-low, 1:working, 0:reset
     input  wire       rstn,
@@ -26,7 +21,7 @@ module sd_file_reader #(
     // SDcard signals (connect to SDcard)
     output wire       sdclk,
     inout             sdcmd,
-    input  wire       sddat0,            // FPGA only read SDDAT signal but never drive it
+    input  wire [3:0] sddat,             // FPGA only read SDDAT signal but never drive it
     // status output (optional for user)
     output wire [1:0] card_type,         // SDv1, SDv2, SDHCv2 or UNKNOWN
     output wire [3:0] card_stat,         // show the sdcard initialize status
@@ -298,14 +293,12 @@ end
 
 
 
-sd_reader #(
-    .CLK_DIV    ( CLK_DIV        )
-) sd_reader_i (
+sd_reader sd_reader_i (
     .rstn       ( rstn           ),
     .clk        ( clk            ),
     .sdclk      ( sdclk          ),
     .sdcmd      ( sdcmd          ),
-    .sddat0     ( sddat0         ),
+    .sddat      ( sddat          ),
     .card_type  ( card_type      ),
     .card_stat  ( card_stat      ),
     .rstart     ( read_start     ),

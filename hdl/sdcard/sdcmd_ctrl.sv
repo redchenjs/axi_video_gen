@@ -64,7 +64,6 @@ reg  [ 1:0] cnt3 = '0;
 reg  [ 7:0] cnt4 = '0;
 reg  [ 7:0] cnt5 = '1;
 
-
 always @ (posedge clk or negedge rstn)
     if(~rstn) begin
         {busy, done, timeout, syntaxe} <= '0;
