@@ -107,6 +107,9 @@ logic [15:0] pic_data_ycol;
 logic [23:0] color_temp;
 logic [23:0] color_data;
 
+logic [15:0] [7:0] pic_fname;
+logic        [3:0] pic_fname_len;
+
 wire pic_head_done = (pic_byte_cnt > (54 - 1));
 wire pic_data_done = (pic_byte_cnt > (54 + BMP_WIDTH * BMP_HEIGHT * 3 - 1));
 
@@ -134,15 +137,16 @@ assign m_axi_wvalid = axi_wvalid;
 
 assign m_axi_bready	= axi_bready;
 
-sd_file_reader #(
-    .FILE_NAME("pic.bmp")
-) sd_file_reader (
+sd_file_reader sd_file_reader(
     .clk(m_axi_aclk),
     .rstn(ctl_sta != IDLE),
 
     .sdclk(sdio_clk),
     .sdcmd(sdio_cmd),
     .sddat(sdio_data),
+
+    .target_fname(pic_fname),
+    .target_fname_len(pic_fname_len),
 
     .card_type(),
     .card_stat(),
@@ -158,7 +162,6 @@ edge2en pic_load_init_en(
     .clk_i(m_axi_aclk),
     .rst_n_i(m_axi_aresetn),
     .data_i(pic_load_init),
-    .pos_edge_o(pic_load_init_p),
     .neg_edge_o(pic_load_init_n)
 );
 
@@ -178,15 +181,31 @@ color_conv color_conv(
 always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn)
 begin
     if (!s_axi_aresetn) begin
-        s_axi_rdata <= {32{1'b0}};
+        pic_load_init_p <= 1'b0;
 
         s_axi_bvalid <= 1'b0;
         s_axi_rvalid <= 1'b0;
+
+        s_axi_rdata <= 32'h0000_0000;
     end else begin
+        pic_load_init_p <= 1'b0;
+
         if (s_axi_awready) begin
             case (s_axi_awaddr[7:0])
                 8'h00:
                     axi_awaddr_base <= s_axi_wdata;
+                8'h04:
+                    pic_fname[3:0] <= s_axi_wdata;
+                8'h08:
+                    pic_fname[7:4] <= s_axi_wdata;
+                8'h0C:
+                    pic_fname[11:8] <= s_axi_wdata;
+                8'h10:
+                    pic_fname[15:12] <= s_axi_wdata;
+                8'h14:
+                    pic_fname_len <= s_axi_wdata[3:0];
+                8'h18:
+                    pic_load_init_p <= 1'b1;
             endcase
         end
 
@@ -194,8 +213,20 @@ begin
             case (s_axi_araddr[7:0])
                 8'h00:
                     s_axi_rdata <= axi_awaddr_base;
+                8'h04:
+                    s_axi_rdata <= pic_fname[3:0];
+                8'h08:
+                    s_axi_rdata <= pic_fname[7:4];
+                8'h0C:
+                    s_axi_rdata <= pic_fname[11:8];
+                8'h10:
+                    s_axi_rdata <= pic_fname[15:12];
+                8'h14:
+                    s_axi_rdata <= {28'h000_0000, pic_fname_len};
+                8'h18:
+                    s_axi_rdata <= {28'h000_0000, pic_load_error, pic_load_done, pic_load_data, pic_load_head};
                 default:
-                    s_axi_rdata <= {32{1'b0}};
+                    s_axi_rdata <= 32'h0000_0000;
             endcase
         end
 
@@ -235,7 +266,7 @@ begin
     end else begin
         case (ctl_sta)
             IDLE:
-                ctl_sta <= pic_load_init_n ? SCAN_FILE : ctl_sta;
+                ctl_sta <= pic_load_init_p | pic_load_init_n ? SCAN_FILE : ctl_sta;
             SCAN_FILE:
                 ctl_sta <= sdcard_file_found ? READ_HEAD : ctl_sta;
             READ_HEAD:
